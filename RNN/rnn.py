@@ -27,19 +27,12 @@ RNN model for crop classification
 
 
 def RNN(x, weights, biases):
-
-    print(num_hidden)
     x = tf.unstack(x, timesteps, 1)
 
-    lstm_cell_qx = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
-    lstm_cell_qx = rnn.DropoutWrapper(lstm_cell_qx, output_keep_prob=(1 - dropout))
+    lstm_cell = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
+    lstm_cell = rnn.DropoutWrapper(lstm_cell, output_keep_prob=(1 - dropout))
 
-    lstm_cell_hx = rnn.BasicLSTMCell(num_hidden, forget_bias=1.0)
-    lstm_cell_hx = rnn.DropoutWrapper(lstm_cell_hx, output_keep_prob=(1 - dropout))
-
-    outputs, _, _, = rnn.static_bidirectional_rnn(
-        lstm_cell_qx, lstm_cell_hx, x, dtype=tf.float32
-    )
+    outputs, _, = rnn.static_rnn(lstm_cell, x, dtype=tf.float32)
 
     return tf.matmul(outputs[-1], weights["out"]) + biases["out"]
 
@@ -60,17 +53,17 @@ def prepare_data(features, labels):
     print(data_Soybeans.shape)
     # Cotton to 50%
     data_Cotton = data[data[:, -1] == 2, :]
-    length = int(len(data_Cotton) / 2.0)
+    length = int(len(data_Cotton) * 0.50)
     data_Cotton = data_Cotton[0:length, :]
     print(data_Cotton.shape)
     # Wheat to 33%
     data_Wheat = data[data[:, -1] == 3, :]
-    length = int(len(data_Wheat) / 3.0)
+    length = int(len(data_Wheat) * 0.33)
     data_Wheat = data_Wheat[0:length, :]
     print(data_Wheat.shape)
-    # Other to 80%
+    # Other to 75%
     data_Other = data[data[:, -1] == 4, :]
-    length = int(len(data_Other) / 1.25)
+    length = int(len(data_Other) * 0.75)
     data_Other = data_Other[0:length, :]
     print(data_Other.shape)
 
@@ -149,7 +142,7 @@ if __name__ == "__main__":
         Y = tf.placeholder("float", [None, num_classes])
 
         # Define weights
-        weights = {"out": tf.Variable(tf.random_normal([num_hidden * 2, num_classes]))}
+        weights = {"out": tf.Variable(tf.random_normal([num_hidden, num_classes]))}
         biases = {"out": tf.Variable(tf.random_normal([num_classes]))}
 
         logits = RNN(X, weights, biases)
