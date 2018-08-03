@@ -14,47 +14,16 @@ import settings
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-def data_pro(labels, features):
-    labels = labels[:, np.newaxis]
-    dataAll = np.concatenate([features, labels], axis=1)
-    idx = np.arange(len(dataAll))
-    np.random.shuffle(idx)
-    dataAll = dataAll[idx, :]
+"""
+Before:
+'Corn': 0, 'Soybeans': 1, 'Cotton': 2, 'SpringWheat': 3, 'DurumWheat': 3, 'WinterWheat': 6, 'Other': 6
 
-    data = []
-    recordNum = len(labels)
-    target_num = [
-        recordNum / 9,
-        recordNum / (9 * 6),
-        recordNum / 9,
-        recordNum / (9 * 6),
-        recordNum / (9 * 6),
-        recordNum / (9 * 6),
-        recordNum * 2 / (9 * 6),
-    ]
-    data_num = [0, 0, 0, 0, 0, 0, 0]
-    # change other labels to 10
-    for index in range(len(dataAll)):
-        if data_num[int(dataAll[index][-1])] >= target_num[int(dataAll[index][-1])]:
-            continue
-        else:
-            data_num[int(dataAll[index][-1])] += 1
-            if dataAll[index][-1] not in [0, 2]:
-                dataAll[index][-1] = 1
-            data.append(list(dataAll[index]))
-
-    data = np.array(data)
-
-    idx = np.arange(len(data))
-    np.random.shuffle(idx)
-    data = data[idx, :]
-
-    new_labels = data[:, -1]
-    new_features = data[:, 0:-1]
-    print(data_num)
-    print(new_labels.shape)
-    print(new_features.shape)
-    return new_labels, new_features
+After:
+'Corn': 0, 'Soybeans': 1, 'Cotton': 2, 'Wheat': 3, 'Other': 4
+"""
+"""
+RNN model for crop classification
+"""
 
 
 def RNN(x, weights, biases):
@@ -75,17 +44,59 @@ def RNN(x, weights, biases):
     return tf.matmul(outputs[-1], weights["out"]) + biases["out"]
 
 
+def prepare_data(features, labels):
+    labels = labels[:, np.newaxis]
+    labels[labels == 6] = 4
+    data = np.concatenate([features, labels], axis=1)
+    idx = np.arange(len(data))
+    np.random.shuffle(idx)
+    data = data[idx, :]
+
+    # Corn
+    data_Corn = data[data[:, -1] == 0, :]
+    print(data_Corn.shape)
+    # Soybeans
+    data_Soybeans = data[data[:, -1] == 1, :]
+    print(data_Soybeans.shape)
+    # Cotton to 50%
+    data_Cotton = data[data[:, -1] == 2, :]
+    length = int(len(data_Cotton) / 2.0)
+    data_Cotton = data_Cotton[0:length, :]
+    print(data_Cotton.shape)
+    # Wheat to 33%
+    data_Wheat = data[data[:, -1] == 3, :]
+    length = int(len(data_Wheat) / 3.0)
+    data_Wheat = data_Wheat[0:length, :]
+    print(data_Wheat.shape)
+    # Other to 80%
+    data_Other = data[data[:, -1] == 4, :]
+    length = int(len(data_Other) / 1.25)
+    data_Other = data_Other[0:length, :]
+    print(data_Other.shape)
+
+    data = np.concatenate(
+        [data_Corn, data_Soybeans, data_Cotton, data_Wheat, data_Other], axis=0
+    )
+    idx = np.arange(len(data))
+    np.random.shuffle(idx)
+    data = data[idx, :]
+
+    features = data[:, 0:-1]
+    labels = data[:, -1]
+    return features, labels
+
+
 if __name__ == "__main__":
     # NOW here we define traning and model parameters
     # Training Parameters
-    learning_rate = 0.001
+    learning_rate = 0.01
     training_steps = 300
     batch_size = 256
 
     # Network Parameters
     num_input = 6
-    timesteps = 154
-    num_classes = 3
+    timesteps = 123
+    num_classes = 5
     dropout = 0.5
     num_hidden = 512
 
@@ -100,11 +111,11 @@ if __name__ == "__main__":
         print("Initializing data")
         features_train = np.load(settings.file_pair[key][1])["features"]
         labels_train = np.load(settings.file_pair[key][1])["labels"]
-        labels_train, features_train = data_pro(labels_train, features_train)
+        features_train, labels_train = prepare_data(features_train, labels_train)
 
         features_test = np.load(settings.file_pair[key][0])["features"]
         labels_test = np.load(settings.file_pair[key][0])["labels"]
-        labels_test, features_test = data_pro(labels_test, features_test)
+        features_test, labels_test = prepare_data(features_test, labels_test)
 
         # convert nan to 0, get rid of nan
         features_train = np.nan_to_num(features_train)
